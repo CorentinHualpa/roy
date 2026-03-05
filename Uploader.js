@@ -607,22 +607,3 @@ export const Uploader = {
   }
 };
 try { window.Uploader = Uploader; } catch {}
-```
-
-**Récap des changements par rapport à v11.3 :**
-
-1. `textDelay` ajouté comme paramètre configurable (défaut 1500ms)
-2. `uploadText` template configurable dans le payload (défaut `📄 Document{plural} uploadé{plural_e} : {files}`)
-3. `buildFormattedText()` helper qui génère le message visible
-4. `done()` : double interact — `complete` puis `text` différé après `textDelay`ms
-5. `formattedResult` ajouté dans le payload du `complete` pour le JS capture
-
-**Flow Voiceflow requis :**
-```
-Custom Action (Uploader) → stop on action ON
-    ↓
-JS capture (last_event.payload → variables)
-    ↓
-Default → DÉCONNECTÉ (dead-end)
-
-Le setTimeout text arrive → Agent step le capte
