@@ -1,6 +1,7 @@
-// Uploader.js – v11.3-roy
+// Uploader.js – v12.0-roy
 // Dark theme – #0D0D0D bg + #E57C23 gold – pour AI Agent Pricing
 // Base: v11.3 © Corentin – fix double click zone + fix 0-byte dead File (SPA Bubble) + FileReader timeout
+// v12.0: Double interact pattern pour compatibilité Agent step
 //
 export const Uploader = {
   name: 'Uploader',
@@ -17,21 +18,17 @@ export const Uploader = {
       return false;
     }
   },
-
   render({ trace, element }) {
     if (!element) {
       console.error('[UploadExt] Élément parent introuvable');
       return;
     }
-
     if (window.__uploaderInstance) {
       console.log('[UploadExt] Cleanup instance précédente');
       try { window.__uploaderInstance(); } catch(e) {}
       window.__uploaderInstance = null;
     }
-
-    console.log('[UploadExt] v11.3-roy - Init');
-
+    console.log('[UploadExt] v12.0-roy - Init (double interact)');
     const findChatContainer = () => {
       const el = document.getElementById('vf-chat') || document.getElementById('voiceflow-chat');
       if (el?.shadowRoot) return el;
@@ -41,15 +38,12 @@ export const Uploader = {
       }
       return null;
     };
-
     let _eventBlockers = [];
     let _blockStyle = null;
-
     const getChatSR = () => {
       const el = document.getElementById('vf-chat') || document.getElementById('voiceflow-chat') || document.querySelector('[id*="vf-chat"]');
       return el?.shadowRoot || null;
     };
-
     const blockChatInput = () => {
       const sr = getChatSR();
       if (!sr) { setTimeout(blockChatInput, 200); return; }
@@ -75,21 +69,17 @@ export const Uploader = {
       }
       console.log('[UploadExt] Chat bloqué');
     };
-
     const unblockChatInput = () => {
       _eventBlockers.forEach(({ el, type, fn }) => el.removeEventListener(type, fn, true));
       _eventBlockers = [];
       if (_blockStyle) { _blockStyle.remove(); _blockStyle = null; }
       console.log('[UploadExt] Chat débloqué');
     };
-
     const scrollToSelf = () => { setTimeout(() => element.scrollIntoView({ behavior:'smooth', block:'nearest' }), 80); };
-
     let isComponentActive = true;
     let isUploading = false;
     let timedTimer = null;
     let cleanupObserver = null;
-
     const setupAutoUnlock = () => {
       const container = findChatContainer();
       if (!container?.shadowRoot) return null;
@@ -113,7 +103,6 @@ export const Uploader = {
       observer.observe(dialogEl, { childList:true, subtree:true });
       return () => observer.disconnect();
     };
-
     const autoUnlock = () => {
       if (!isComponentActive) return;
       isComponentActive = false;
@@ -122,9 +111,7 @@ export const Uploader = {
       root.style.display = 'none';
       unblockChatInput();
     };
-
     setTimeout(() => { if (isComponentActive && !isUploading) cleanupObserver = setupAutoUnlock(); }, 500);
-
     const p = trace?.payload || {};
     const title         = p.title || '';
     const subtitle      = p.subtitle || '';
@@ -134,7 +121,7 @@ export const Uploader = {
     const maxFileSizeMB = p.maxFileSizeMB || 25;
     const maxFiles      = p.maxFiles || 10;
     const variables     = p.variables || {};
-
+    const textDelay     = Number(p.textDelay) || 1500;
     // ═══════════════════════════════════
     // 🎨 DARK THEME — ROY / AI Agent Pricing
     // bg: #0D0D0D  cards: #1A1A1A  accent: #E57C23
@@ -156,7 +143,6 @@ export const Uploader = {
       accentHover:'#D06A1A',
       accentGlow: 'rgba(229,124,35,0.15)'
     };
-
     const webhook          = p.webhook || {};
     const webhookUrl       = webhook.url;
     const webhookMethod    = (webhook.method || 'POST').toUpperCase();
@@ -181,14 +167,13 @@ export const Uploader = {
     const defaultAutoSteps = [{ progress:0 },{ progress:30 },{ progress:60 },{ progress:85 },{ progress:100 }];
     const timedPhases      = Array.isArray(loaderCfg.phases) ? loaderCfg.phases : [];
     const totalSeconds     = Number(loaderCfg.totalSeconds) > 0 ? Number(loaderCfg.totalSeconds) : 120;
-
+    // ── Message formaté configurable ──
+    const uploadTextTemplate = p.uploadText || '📄 Document{plural} uploadé{plural_e} : {files}';
     if (!webhookUrl) {
       element.innerHTML = `<div style="padding:16px;color:${colors.error};background:${colors.card};border:1px solid ${colors.border};border-radius:12px;font-family:sans-serif">Config manquante: webhook.url</div>`;
       return;
     }
-
     const hasTitle = title?.trim(), hasSubtitle = subtitle?.trim(), showHeader = hasTitle || hasSubtitle;
-
     // ═══════════════════════════════════
     // 🎨 CSS — DARK THEME
     // ═══════════════════════════════════
@@ -253,13 +238,11 @@ export const Uploader = {
       .upl-overlay{display:none;position:absolute;inset:0;z-index:10}
       .upl-overlay.show{display:block}
     `;
-
     const icons = {
       upload: `<svg class="upl-zone-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 15V3m0 0l-4 4m4-4l4 4"/><path d="M2 17l.621 2.485A2 2 0 004.561 21h14.878a2 2 0 001.94-1.515L22 17"/></svg>`,
       file:   `<svg class="upl-item-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/></svg>`,
       x:      `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>`
     };
-
     const root = document.createElement('div');
     root.className = 'upl';
     root.style.cssText = 'position:relative;overflow:hidden;max-width:100%';
@@ -307,7 +290,6 @@ export const Uploader = {
       </div>
     `;
     element.appendChild(root);
-
     const initialView  = root.querySelector('.upl-initial-view');
     const twoColView   = root.querySelector('#two-col-view');
     const zoneMain     = root.querySelector('#drop-zone-main');
@@ -323,14 +305,22 @@ export const Uploader = {
     const loaderFill   = root.querySelector('.upl-loader-fill');
     const overlay      = root.querySelector('.upl-overlay');
     const bodyDiv      = root.querySelector('.upl-body');
-
     let selectedFiles = [];
-
     const clamp      = (v, a, b) => Math.max(a, Math.min(b, v));
     const formatSize = bytes => bytes < 1024 ? bytes + ' o' : bytes < 1024*1024 ? (bytes/1024).toFixed(1) + ' Ko' : (bytes/(1024*1024)).toFixed(1) + ' Mo';
     const showMsg    = (text, type = 'warn') => { msgDiv.textContent = text; msgDiv.className = `upl-msg show ${type}`; };
     const hideMsg    = () => { msgDiv.className = 'upl-msg'; };
-
+    // ── Helper: build formatted text for Agent step ──
+    const buildFormattedText = (files) => {
+      const plural = files.length > 1 ? 's' : '';
+      const plural_e = files.length > 1 ? 's' : '';
+      const fileNames = files.map(f => f.name).join(', ');
+      return uploadTextTemplate
+        .replace(/\{plural\}/g, plural)
+        .replace(/\{plural_e\}/g, plural_e)
+        .replace(/\{files\}/g, fileNames)
+        .replace(/\{count\}/g, String(files.length));
+    };
     const updateList = () => {
       hideMsg();
       if (!selectedFiles.length) {
@@ -361,7 +351,6 @@ export const Uploader = {
       if (selectedFiles.length > 0 && !enough) showMsg(`${requiredFiles - selectedFiles.length} fichier(s) manquant(s)`, 'warn');
       scrollToSelf();
     };
-
     // ── ✅ FIX 1 : rejet immédiat size=0 + timeout FileReader ──────────
     const readFileToMemory = (file) => {
       return new Promise((resolve, reject) => {
@@ -383,7 +372,6 @@ export const Uploader = {
         reader.readAsArrayBuffer(file);
       });
     };
-
     const addFiles = async (files) => {
       const errs  = [];
       const toRead = [];
@@ -410,7 +398,6 @@ export const Uploader = {
       }
       if (errs.length) showMsg(errs[0], 'err');
     };
-
     // ── ✅ FIX 2 : stopPropagation sur input pour éviter double click ───
     const bindZone = (zone, input) => {
       input.addEventListener('click', (e) => e.stopPropagation());
@@ -425,15 +412,12 @@ export const Uploader = {
     };
     bindZone(zoneMain,    inputMain);
     bindZone(zoneCompact, inputCompact);
-
     blockChatInput();
-
     sendBtn.onclick = async () => {
       if (selectedFiles.length < requiredFiles || !isComponentActive) return;
       console.log('[UploadExt] Envoi — fichiers:', selectedFiles.map(f => `${f.name}(${f.size})`));
       isUploading = true;
       if (cleanupObserver) { cleanupObserver(); cleanupObserver = null; }
-
       const corruptFiles = selectedFiles.filter(f => f.size === 0);
       if (corruptFiles.length > 0) {
         isUploading = false;
@@ -441,7 +425,6 @@ export const Uploader = {
         window?.voiceflow?.chat?.interact?.({ type:'complete', payload:{ webhookSuccess:false, error:'corrupt_files', buttonPath:'error' } });
         return;
       }
-
       root.style.pointerEvents = 'none';
       overlay.classList.add('show');
       sendBtn.disabled = true;
@@ -449,7 +432,6 @@ export const Uploader = {
       const ui = showLoaderUI();
       if (loaderMode === 'timed') ui.timed(buildPlan());
       else ui.auto(defaultAutoSteps);
-
       try {
         const resp = await post({ url:webhookUrl, method:webhookMethod, headers:webhookHeaders, timeoutMs:webhookTimeoutMs, retries:webhookRetries, files:selectedFiles, fileFieldName, extra, vfContext, variables });
         console.log('[UploadExt] Response:', resp);
@@ -477,7 +459,9 @@ export const Uploader = {
         window?.voiceflow?.chat?.interact?.({ type:'complete', payload:{ webhookSuccess:false, error:errMsg, buttonPath:'error' } });
       }
     };
-
+    // ═══════════════════════════════════════════════════════════
+    // 🔄 LOADER UI — avec double interact dans done()
+    // ═══════════════════════════════════════════════════════════
     function showLoaderUI() {
       loader.classList.add('show');
       bodyDiv.style.display = 'none';
@@ -507,8 +491,11 @@ export const Uploader = {
           const step=now=>{ if(locked){cb?.();return;} const k=clamp((now-t0)/ms,0,1),nv=s+(t-s)*k; if(nv>cur){cur=nv;paint();} if(k<1)requestAnimationFrame(step);else cb?.(); };
           requestAnimationFrame(step);
         },
+        // ════════════════════════════════════════════════════════
+        // ✅ DOUBLE INTERACT — complete (data) + text (Agent)
+        // ════════════════════════════════════════════════════════
         done(data) {
-          console.log('[UploadExt] Upload terminé');
+          console.log('[UploadExt] Upload terminé — double interact');
           locked=true; clear();
           this.to(100,400,()=>{
             loader.classList.add('complete');
@@ -516,13 +503,39 @@ export const Uploader = {
               isUploading=false; isComponentActive=false;
               root.style.display='none';
               unblockChatInput();
-              window?.voiceflow?.chat?.interact?.({ type:'complete', payload:{ webhookSuccess:true, webhookResponse:data, files:selectedFiles.map(f=>({name:f.name,size:f.size,type:f.type})), buttonPath:'success' } });
+
+              const formatted = buildFormattedText(selectedFiles);
+
+              // 1. COMPLETE — Resolve le Custom Action (silencieux)
+              //    Stocke les données dans last_event.payload
+              //    Le flow traverse le JS capture → Default → dead-end
+              window?.voiceflow?.chat?.interact?.({
+                type: 'complete',
+                payload: {
+                  webhookSuccess: true,
+                  webhookResponse: data,
+                  files: selectedFiles.map(f=>({name:f.name, size:f.size, type:f.type})),
+                  formattedResult: formatted,
+                  buttonPath: 'success'
+                }
+              });
+
+              // 2. TEXT — Après que le flow ait traversé et atteint le dead-end,
+              //    envoie un message visible dans le chat + vf_memory
+              //    → L'Agent step capte ce message et réagit
+              setTimeout(() => {
+                console.log('[UploadExt] Envoi text différé pour Agent step:', formatted);
+                window?.voiceflow?.chat?.interact?.({
+                  type: 'text',
+                  payload: formatted,
+                });
+              }, textDelay);
+
             }, autoCloseDelayMs);
           });
         }
       };
     }
-
     function buildPlan() {
       const haveSeconds = timedPhases.every(ph=>Number(ph.seconds)>0);
       const total = haveSeconds ? timedPhases.reduce((s,ph)=>s+Number(ph.seconds),0) : totalSeconds;
@@ -536,7 +549,6 @@ export const Uploader = {
         return {durationMs:Math.max(500,a.seconds*1000), progressStart:pStart, progressEnd:pEnd};
       });
     }
-
     async function post({ url, method, headers, timeoutMs, retries, files, fileFieldName, extra, vfContext, variables }) {
       const buildFormData = () => {
         const fd = new FormData();
@@ -571,7 +583,6 @@ export const Uploader = {
       }
       throw err||new Error('Failed');
     }
-
     async function poll({ statusUrl, headers, intervalMs, maxAttempts, onTick }) {
       for (let i=1; i<=maxAttempts; i++) {
         const r=await fetch(statusUrl,{headers});
@@ -584,9 +595,7 @@ export const Uploader = {
       }
       throw new Error('Timeout');
     }
-
     scrollToSelf();
-
     const cleanup = () => {
       if (timedTimer) clearInterval(timedTimer);
       if (cleanupObserver) cleanupObserver();
@@ -597,5 +606,23 @@ export const Uploader = {
     return cleanup;
   }
 };
-
 try { window.Uploader = Uploader; } catch {}
+```
+
+**Récap des changements par rapport à v11.3 :**
+
+1. `textDelay` ajouté comme paramètre configurable (défaut 1500ms)
+2. `uploadText` template configurable dans le payload (défaut `📄 Document{plural} uploadé{plural_e} : {files}`)
+3. `buildFormattedText()` helper qui génère le message visible
+4. `done()` : double interact — `complete` puis `text` différé après `textDelay`ms
+5. `formattedResult` ajouté dans le payload du `complete` pour le JS capture
+
+**Flow Voiceflow requis :**
+```
+Custom Action (Uploader) → stop on action ON
+    ↓
+JS capture (last_event.payload → variables)
+    ↓
+Default → DÉCONNECTÉ (dead-end)
+
+Le setTimeout text arrive → Agent step le capte
